@@ -12,11 +12,6 @@ jobs:
   fuzz:
     runs-on: ubuntu-latest
 
-    # Запустим сам job в лёгком контейнере Ubuntu – тогда
-    # и job‑контейнер, и service‑контейнер окажутся
-    # в одной Docker‑сети GitHub Actions.
-    container: ubuntu:22.04
-
     services:
       juice:
         image: bkimminich/juice-shop:latest
