@@ -1,4 +1,4 @@
-name: Fuzzing
+name: Fuzzing Juice Shop login
 
 on:
   push:
@@ -6,30 +6,45 @@ on:
 
 permissions:
   contents: write
-  security-events: write   # нужно, чтобы загружать артефакты
+  security-events: write   # для артефактов
 
 jobs:
-  ffuf:
+  fuzz:
     runs-on: ubuntu-latest
+
+    # Запустим сам job в лёгком контейнере Ubuntu – тогда
+    # и job‑контейнер, и service‑контейнер окажутся
+    # в одной Docker‑сети GitHub Actions.
+    container: ubuntu:22.04
 
     services:
       juice:
-        image: bkimminich/juice-shop            # последний стабильный образ
-        ports:
-          - 3000:3000
+        image: bkimminich/juice-shop:latest
+        # убираем healthcheck – будем ждать вручную
         options: >-
-          --health-cmd="curl -fs http://localhost:3000 || exit 1"
-          --health-interval=5s
-          --health-retries=20
+          --name juice
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install tooling
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y wget jq
+          apt-get update -qq
+          apt-get install -y wget jq curl
           go install github.com/ffuf/ffuf/v2@latest
+
+      # ждём, пока приложение действительно поднимется
+      - name: Wait for Juice Shop
+        run: |
+          for i in {1..60}; do
+            if curl -sSf http://juice:3000/ > /dev/null; then
+              echo "Juice Shop is ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "Juice Shop did not start in time" >&2
+          docker logs juice || true
+          exit 1
 
       - name: Download SQL‑i payloads
         run: |
@@ -39,16 +54,13 @@ jobs:
       - name: Run fuzz‑login.sh
         run: |
           chmod +x scripts/fuzz-login.sh
-          ./scripts/fuzz-login.sh payloads.txt artifacts
+          ./scripts/fuzz-login.sh payloads.txt artifacts http://juice:3000
 
-      - name: Save Juice Shop logs
-        run: |
-          docker logs ${{ job.services.juice.id }} > artifacts/juice-logs.log
+      - name: Save Juice Shop logs
+        run: docker logs juice > artifacts/juice-logs.log
 
       - name: Upload security reports
         uses: actions/upload-artifact@v4
         with:
           name: security-reports-bundle
           path: artifacts
-
-          
