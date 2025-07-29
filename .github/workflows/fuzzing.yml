@@ -6,46 +6,47 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
-  security-events: write
-  actions: read
+  security-events: write   # нужно, чтобы загружать артефакты
 
 jobs:
   ffuf:
     runs-on: ubuntu-latest
-    services:
-        juice:
-          image: bkimminich/juice-shop
-          ports:
-            - 3000:3000
-    steps:
-      - name: Wait for service
-        run: |
-            sleep 10 
-            curl --path-as-is -i -s -k -X $'POST' \
-              -H $'Host: localhost:3000' -H $'Content-Length: 43' -H $'Content-Type: application/json' -H $'Connection: keep-alive' \
-              --data-binary $'{\"email\":\"\' or 1=1 -- -\",\"password\":\"pass\"}' \
-              $'http://localhost:3000/rest/user/login'
 
-      - name: Get payloads
+    services:
+      juice:
+        image: bkimminich/juice-shop            # последний стабильный образ
+        ports:
+          - 3000:3000
+        options: >-
+          --health-cmd="curl -fs http://localhost:3000 || exit 1"
+          --health-interval=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tooling
         run: |
-          wget https://raw.githubusercontent.com/swisskyrepo/PayloadsAllTheThings/refs/heads/master/SQL%20Injection/Intruder/SQL-Injection
-      
-      - name: Install fuzzing
-        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y wget jq
           go install github.com/ffuf/ffuf/v2@latest
 
-      - name: Run fuzzing
+      - name: Download SQL‑i payloads
         run: |
-          $HOME/go/bin/ffuf || true
+          wget -qO payloads.txt \
+            https://raw.githubusercontent.com/swisskyrepo/PayloadsAllTheThings/master/SQL%20Injection/Intruder/SQL-Injection
 
-      - name: Get Logs from Service
+      - name: Run fuzz‑login.sh
         run: |
-          docker logs $(docker ps -q) > juice-logs.log
+          chmod +x scripts/fuzz-login.sh
+          ./scripts/fuzz-login.sh payloads.txt artifacts
 
-      - name: Upload results
+      - name: Save Juice Shop logs
+        run: |
+          docker logs ${{ job.services.juice.id }} > artifacts/juice-logs.log
+
+      - name: Upload security reports
         uses: actions/upload-artifact@v4
         with:
           name: security-reports-bundle
-          path: |
-            juice-logs.log
+          path: artifacts
