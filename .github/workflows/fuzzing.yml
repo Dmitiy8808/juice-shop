@@ -32,9 +32,11 @@ jobs:
           set -e
           export DEBIAN_FRONTEND=noninteractive
           apt-get update -qq
+          # ставим curl/git/Go И ОБЯЗАТЕЛЬНО корневые сертификаты
           apt-get install -y --no-install-recommends \
-            wget jq curl git golang-go
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"   # чтобы ffuf попал в PATH
+            wget jq curl git golang-go ca-certificates
+          update-ca-certificates          # на всякий случай
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           go install github.com/ffuf/ffuf/v2@latest
 
       # ждём, пока приложение действительно поднимется
