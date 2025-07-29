@@ -2,7 +2,7 @@ name: Fuzzing
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
 
 permissions:
   contents: write
@@ -50,3 +50,5 @@ jobs:
         with:
           name: security-reports-bundle
           path: artifacts
+
+          
