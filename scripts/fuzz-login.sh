@@ -10,11 +10,11 @@ mkdir -p "$OUT_DIR"
 
 # FFUF ищет успешные (200 OK) ответы на POST /rest/user/login
 ffuf \
-  -w "$WORDLIST":PAY          `# PAY — наше ключевое слово` \
+  -w "$WORDLIST":PAYLOAD          \
   -u "$URL"                   \
   -X POST                     \
   -H "Content-Type: application/json" \
-  -d '{"email":"PAY","password":"pass"}' \
-  -t 50                       `# параллельные потоки` \
+  -d '{"email":"PAYLOAD","password":"pass"}' \
+  -t 50                       \
   -mc 200                     `# показываем только 200 OK` \
   -o "$OUT_DIR/ffuf-results.json" -of json
